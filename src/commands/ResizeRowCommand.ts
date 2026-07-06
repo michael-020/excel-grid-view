@@ -2,11 +2,11 @@ import type { Command } from "./Command.js";
 import { RowDefinition } from "../models/Dimension.js";
 
 export class ResizeRowCommand implements Command {
-  private previousHeight: number;
-
-  constructor(private readonly row: RowDefinition, private readonly newHeight: number) {
-    this.previousHeight = row.height;
-  }
+  constructor(
+    private readonly row: RowDefinition,
+    private readonly previousHeight: number,
+    private readonly newHeight: number
+  ) {}
 
   execute(): void {
     this.row.height = this.newHeight;

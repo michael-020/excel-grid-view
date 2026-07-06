@@ -5,6 +5,7 @@ import { CommandManager } from "./commands/CommandManager.js";
 import { EditCellCommand } from "./commands/EditCellCommand.js";
 import { ResizeColumnCommand } from "./commands/ResizeColumnCommand.js";
 import { ResizeRowCommand } from "./commands/ResizeRowCommand.js";
+import { BatchEditCommand } from "./commands/BatchEditCommand.js";
 import { generateSampleRecords } from "./data/sampleData.js";
 import type { RecordRow } from "./data/sampleData.js";
 
@@ -35,9 +36,15 @@ export class Grid {
   private scrollTop = 0;
   private isDraggingColumn = false;
   private isDraggingRow = false;
+  private isSelectingRange = false;
   private activeResizeIndex = -1;
   private startDragPosition = 0;
   private startSize = 0;
+  private selectionStartRow = -1;
+  private selectionStartCol = -1;
+  private selectionCurrentRow = -1;
+  private selectionCurrentCol = -1;
+  private clipboard: { rows: number; cols: number; values: Array<Array<string | number>> } | null = null;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -67,6 +74,24 @@ export class Grid {
     this.resizeCanvas();
     await this.loadData();
     this.render();
+  }
+
+  public undo(): void {
+    this.commandManager.undo();
+    this.render();
+  }
+
+  public redo(): void {
+    this.commandManager.redo();
+    this.render();
+  }
+
+  public canUndo(): boolean {
+    return this.commandManager.canUndo();
+  }
+
+  public canRedo(): boolean {
+    return this.commandManager.canRedo();
   }
 
   public resizeCanvas(): void {
@@ -251,6 +276,10 @@ export class Grid {
   }
 
   private handleMouseDown(event: MouseEvent): void {
+    if (event.button !== 0) {
+      return;
+    }
+
     if (this.editInput.style.display === "block") {
       this.applyEdit(this.editInput.value);
       this.hideEditInput();
@@ -288,7 +317,12 @@ export class Grid {
     const rowIndex = this.getRowIndexAtPosition(contentY - Grid.HEADER_HEIGHT);
     const colIndex = this.getColumnIndexAtPosition(contentX - Grid.HEADER_WIDTH);
     if (rowIndex >= 0 && colIndex >= 0) {
-      this.selection.selectCell(rowIndex, colIndex);
+      this.isSelectingRange = true;
+      this.selectionStartRow = rowIndex;
+      this.selectionStartCol = colIndex;
+      this.selectionCurrentRow = rowIndex;
+      this.selectionCurrentCol = colIndex;
+      this.selection.selectRange(rowIndex, colIndex, rowIndex, colIndex);
       this.render();
     }
   }
@@ -315,6 +349,18 @@ export class Grid {
       return;
     }
 
+    if (this.isSelectingRange) {
+      const rowIndex = this.getRowIndexAtPosition(contentY - Grid.HEADER_HEIGHT);
+      const colIndex = this.getColumnIndexAtPosition(contentX - Grid.HEADER_WIDTH);
+      if (rowIndex >= 0 && colIndex >= 0) {
+        this.selectionCurrentRow = rowIndex;
+        this.selectionCurrentCol = colIndex;
+        this.selection.selectRange(this.selectionStartRow, this.selectionStartCol, rowIndex, colIndex);
+        this.render();
+      }
+      return;
+    }
+
     if (contentY <= Grid.HEADER_HEIGHT) {
       const colIndex = this.getColumnIndexAtPosition(contentX - Grid.HEADER_WIDTH);
       this.canvas.style.cursor = colIndex >= 0 ? "col-resize" : "default";
@@ -333,19 +379,33 @@ export class Grid {
   private handleMouseUp(): void {
     if (this.isDraggingColumn && this.activeResizeIndex >= 0) {
       const finalWidth = this.columnDefinitions[this.activeResizeIndex].width;
-      this.commandManager.execute(new ResizeColumnCommand(this.columnDefinitions[this.activeResizeIndex], finalWidth));
+      if (finalWidth !== this.startSize) {
+        this.commandManager.execute(new ResizeColumnCommand(this.columnDefinitions[this.activeResizeIndex], this.startSize, finalWidth));
+      }
     }
 
     if (this.isDraggingRow && this.activeResizeIndex >= 0) {
       const finalHeight = this.rowDefinitions[this.activeResizeIndex].height;
-      this.commandManager.execute(new ResizeRowCommand(this.rowDefinitions[this.activeResizeIndex], finalHeight));
+      if (finalHeight !== this.startSize) {
+        this.commandManager.execute(new ResizeRowCommand(this.rowDefinitions[this.activeResizeIndex], this.startSize, finalHeight));
+      }
+    }
+
+    if (this.isSelectingRange) {
+      this.selection.selectRange(this.selectionStartRow, this.selectionStartCol, this.selectionCurrentRow, this.selectionCurrentCol);
+      this.render();
     }
 
     this.isDraggingColumn = false;
     this.isDraggingRow = false;
+    this.isSelectingRange = false;
     this.activeResizeIndex = -1;
     this.startDragPosition = 0;
     this.startSize = 0;
+    this.selectionStartRow = -1;
+    this.selectionStartCol = -1;
+    this.selectionCurrentRow = -1;
+    this.selectionCurrentCol = -1;
   }
 
   private handleDoubleClick(event: MouseEvent): void {
@@ -412,9 +472,15 @@ export class Grid {
     this.editInput.style.top = `${y}px`;
     this.editInput.style.width = `${Math.max(0, width)}px`;
     this.editInput.style.height = `${Math.max(0, height)}px`;
+    this.editInput.style.backgroundColor = "#ffffff";
+    this.editInput.style.border = "1px solid #93c5fd";
+    this.editInput.style.color = "#111827";
+    this.editInput.style.padding = "0 8px";
+    this.editInput.style.lineHeight = `${height}px`;
     this.editInput.value = String(this.data.getCellValue(row, col));
     this.editInput.style.display = "block";
     this.editInput.focus();
+    this.editInput.setSelectionRange(0, this.editInput.value.length);
     this.selection.selectCell(row, col);
     this.render();
   }
@@ -429,6 +495,12 @@ export class Grid {
     const col = this.selection.anchorCol;
     const numericValue = value.trim() === "" ? "" : Number(value);
     const finalValue = Number.isNaN(numericValue) ? value : numericValue;
+    const currentValue = this.data.getCellValue(row, col);
+
+    if (currentValue === finalValue) {
+      return;
+    }
+
     this.commandManager.execute(new EditCellCommand(this.data, row, col, finalValue));
     this.autoResizeColumnIfNeeded(col, String(finalValue));
     this.render();
@@ -468,6 +540,57 @@ export class Grid {
   }
 
   private handleKeyDown(event: KeyboardEvent): void {
+    // Shortcuts: undo/redo, copy/paste, aggregates
+    const isUndoShortcut = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z" && !event.shiftKey;
+    const isRedoShortcut = (event.ctrlKey || event.metaKey) && (event.key.toLowerCase() === "y" || (event.key.toLowerCase() === "z" && event.shiftKey));
+    const isCopy = (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "c";
+    const isPaste = (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "v";
+    const isSum = (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "s";
+    const isAvg = (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "a";
+    const isCount = (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "k";
+    const isMin = (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "m";
+    const isMax = (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "x";
+    const isDiff = (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "d";
+
+    if (isUndoShortcut) {
+      event.preventDefault();
+      this.commandManager.undo();
+      this.render();
+      return;
+    }
+
+    if (isRedoShortcut) {
+      event.preventDefault();
+      this.commandManager.redo();
+      this.render();
+      return;
+    }
+
+    if (isCopy) {
+      event.preventDefault();
+      this.copySelection();
+      return;
+    }
+
+    if (isPaste) {
+      event.preventDefault();
+      this.pasteClipboardAt(this.selection.anchorRow, this.selection.anchorCol);
+      return;
+    }
+
+    if (isSum || isAvg || isCount || isMin || isMax || isDiff) {
+      event.preventDefault();
+      const func = isSum ? "sum" : isAvg ? "avg" : isCount ? "count" : isMin ? "min" : isMax ? "max" : "diff";
+      const result = this.computeAggregate(func);
+      if (result !== null) {
+        const dest = this.findAggregateDestination();
+        this.commandManager.execute(new EditCellCommand(this.data, dest.row, dest.col, result));
+        this.selection.selectCell(dest.row, dest.col);
+        this.render();
+      }
+      return;
+    }
+
     if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter"].includes(event.key)) {
       return;
     }
@@ -558,6 +681,102 @@ export class Grid {
     this.rowDefinitions[rowIndex].height = Math.max(Grid.MIN_ROW_HEIGHT, maxHeight);
     this.updateSpacerSize();
     this.render();
+  }
+
+  private copySelection(): void {
+    const range = this.selection.range;
+    const rows = range.maxRow - range.minRow + 1;
+    const cols = range.maxCol - range.minCol + 1;
+    const values: Array<Array<string | number>> = [];
+    for (let r = 0; r < rows; r += 1) {
+      const rowArr: Array<string | number> = [];
+      for (let c = 0; c < cols; c += 1) {
+        rowArr.push(this.data.getCellValue(range.minRow + r, range.minCol + c));
+      }
+      values.push(rowArr);
+    }
+    this.clipboard = { rows, cols, values };
+  }
+
+  private pasteClipboardAt(targetRow: number, targetCol: number): void {
+    if (!this.clipboard) {
+      return;
+    }
+    const edits: { row: number; col: number; oldValue: string | number; newValue: string | number }[] = [];
+    for (let r = 0; r < this.clipboard.rows; r += 1) {
+      for (let c = 0; c < this.clipboard.cols; c += 1) {
+        const destRow = targetRow + r;
+        const destCol = targetCol + c;
+        const newValue = this.clipboard.values[r][c];
+        const oldValue = this.data.getCellValue(destRow, destCol);
+        if (oldValue !== newValue) {
+          edits.push({ row: destRow, col: destCol, oldValue: oldValue ?? "", newValue });
+        }
+      }
+    }
+    if (edits.length === 0) {
+      return;
+    }
+    const cmd = new BatchEditCommand(this.data, edits);
+    this.commandManager.execute(cmd);
+    this.render();
+  }
+
+  private computeAggregate(func: string): number | string | null {
+    const values: number[] = [];
+    const range = this.selection.range;
+    for (let r = range.minRow; r <= range.maxRow; r += 1) {
+      for (let c = range.minCol; c <= range.maxCol; c += 1) {
+        const v = this.data.getCellValue(r, c);
+        const n = typeof v === "number" ? v : Number(v);
+        if (!Number.isNaN(n)) {
+          values.push(n);
+        }
+      }
+    }
+    if (values.length === 0) return 0;
+    switch (func) {
+      case "sum":
+        return values.reduce((a, b) => a + b, 0);
+      case "avg":
+        return values.reduce((a, b) => a + b, 0) / values.length;
+      case "count":
+        return values.length;
+      case "min":
+        return Math.min(...values);
+      case "max":
+        return Math.max(...values);
+      case "diff":
+        return Math.max(...values) - Math.min(...values);
+      default:
+        return null;
+    }
+  }
+
+  private findAggregateDestination(): { row: number; col: number } {
+    const range = this.selection.range;
+    const startCol = range.maxCol;
+    let row = range.maxRow + 1;
+
+    // Try directly below the selection in the last column
+    for (let r = row; r <= row + 1000; r += 1) {
+      const v = this.data.getCellValue(r, startCol);
+      if (v === "" || v === undefined) {
+        return { row: r, col: startCol };
+      }
+    }
+
+    // If none found downward in the same column, try scanning to the right on the first candidate row
+    const candidateRow = row;
+    for (let c = startCol + 1; c < startCol + 1000; c += 1) {
+      const v = this.data.getCellValue(candidateRow, c);
+      if (v === "" || v === undefined) {
+        return { row: candidateRow, col: c };
+      }
+    }
+
+    // Fallback: put at the cell immediately below the selection (even if occupied)
+    return { row, col: startCol };
   }
 
   private getColumnOffset(index: number): number {
