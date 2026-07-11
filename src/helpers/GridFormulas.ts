@@ -7,34 +7,28 @@ export function evaluateFormula(formula: string, data: any): { error?: string; v
   const values: number[] = [];
   let count = 0;
 
-  if (func === "count" && args.length === 2) {
-    const firstCell = args[0].match(/^([A-Za-z]+)\s*(\d+)$/);
-    const secondCell = args[1].match(/^([A-Za-z]+)\s*(\d+)$/);
-    if (firstCell && secondCell) {
-      const startCol = colLabelToIndex(firstCell[1]);
-      const startRow = Number(firstCell[2]) - 1;
-      const endCol = colLabelToIndex(secondCell[1]);
-      const endRow = Number(secondCell[2]) - 1;
-      if (startCol < 0 || startRow < 0 || endCol < 0 || endRow < 0) {
-        return { error: "Invalid reference" };
-      }
-      const minCol = Math.min(startCol, endCol);
-      const maxCol = Math.max(startCol, endCol);
-      const minRow = Math.min(startRow, endRow);
-      const maxRow = Math.max(startRow, endRow);
-      return { value: (maxCol - minCol + 1) * (maxRow - minRow + 1) };
-    }
-  }
-
-  for (const arg of args) {
+  if (args.length === 2 && isSingleCellRef(args[0]) && isSingleCellRef(args[1]) && ["sum", "avg", "average", "count", "min", "max"].includes(func)) {
+    const rangeRef = rangeRefFromCellRefs(args[0], args[1]);
+    if (!rangeRef) return { error: "Invalid reference" };
     if (func === "count") {
-      const countResult = countValuesFromRef(arg, data);
+      const countResult = countValuesFromRef(rangeRef, data);
       if (countResult.error) return { error: countResult.error };
-      count += countResult.count!;
-    } else {
-      const vals = valuesFromRef(arg, data);
-      if (vals.error) return { error: vals.error };
-      values.push(...(vals.values || []));
+      return { value: countResult.count ?? 0 };
+    }
+    const vals = valuesFromRef(rangeRef, data);
+    if (vals.error) return { error: vals.error };
+    values.push(...(vals.values || []));
+  } else {
+    for (const arg of args) {
+      if (func === "count") {
+        const countResult = countValuesFromRef(arg, data);
+        if (countResult.error) return { error: countResult.error };
+        count += countResult.count!;
+      } else {
+        const vals = valuesFromRef(arg, data);
+        if (vals.error) return { error: vals.error };
+        values.push(...(vals.values || []));
+      }
     }
   }
 
@@ -53,6 +47,17 @@ export function evaluateFormula(formula: string, data: any): { error?: string; v
     default:
       return { error: `Unknown function ${func}` };
   }
+}
+
+function isSingleCellRef(ref: string): boolean {
+  return /^([A-Za-z]+)\s*(\d+)$/.test(ref);
+}
+
+function rangeRefFromCellRefs(first: string, second: string): string | null {
+  const a = first.match(/^([A-Za-z]+)\s*(\d+)$/);
+  const b = second.match(/^([A-Za-z]+)\s*(\d+)$/);
+  if (!a || !b) return null;
+  return `${a[1]}${a[2]}:${b[1]}${b[2]}`;
 }
 
 export function valuesFromRef(ref: string, data: any): { error?: string; values?: number[] } {
