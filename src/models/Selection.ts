@@ -48,9 +48,13 @@ export class Selection {
     avgString: string;
   } {
     const values: number[] = [];
+    let count = 0;
     for (let row = this.range.minRow; row <= this.range.maxRow; row += 1) {
       for (let col = this.range.minCol; col <= this.range.maxCol; col += 1) {
         const cellValue = data.getCellValue(row, col);
+        if (cellValue !== "" && cellValue !== undefined) {
+          count += 1;
+        }
         const numeric = typeof cellValue === "number" ? cellValue : Number(cellValue);
         if (!Number.isNaN(numeric)) {
           values.push(numeric);
@@ -58,18 +62,17 @@ export class Selection {
       }
     }
 
-    const count = values.length;
     const sum = values.reduce((acc, value) => acc + value, 0);
-    const min = count > 0 ? Math.min(...values) : undefined;
-    const max = count > 0 ? Math.max(...values) : undefined;
-    const avg = count > 0 ? sum / count : undefined;
+    const min = values.length > 0 ? Math.min(...values) : undefined;
+    const max = values.length > 0 ? Math.max(...values) : undefined;
+    const avg = values.length > 0 ? sum / values.length : undefined;
 
     return {
       mode: this.mode,
       anchor: `${this.anchorRow + 1}:${this.anchorCol + 1}`,
       range: `${this.range.minRow + 1}:${this.range.minCol + 1} - ${this.range.maxRow + 1}:${this.range.maxCol + 1}`,
       count,
-      sumString: count > 0 ? sum.toString() : "0",
+      sumString: values.length > 0 ? sum.toString() : "0",
       minString: min !== undefined ? min.toString() : "-",
       maxString: max !== undefined ? max.toString() : "-",
       avgString: avg !== undefined ? avg.toFixed(2) : "-",
