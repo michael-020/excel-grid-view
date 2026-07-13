@@ -2,8 +2,26 @@ import type { Grid } from "../Grid.js";
 import { showEditInput } from "./GridEditor.js";
 
 export function handleKeyDown(grid: Grid, event: KeyboardEvent): void {
+  const isUndo = (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z";
+  const isRedo = (event.ctrlKey || event.metaKey) && (event.shiftKey && event.key.toLowerCase() === "z" || event.key.toLowerCase() === "y");
   const isCopy = (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "c";
   const isPaste = (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "v";
+
+  if (isUndo) {
+    event.preventDefault();
+    if (grid.canUndo()) {
+      grid.undo();
+    }
+    return;
+  }
+
+  if (isRedo) {
+    event.preventDefault();
+    if (grid.canRedo()) {
+      grid.redo();
+    }
+    return;
+  }
 
   if (isCopy) {
     event.preventDefault();

@@ -8,11 +8,11 @@ function clearCanvas(context: CanvasRenderingContext2D, canvas: HTMLCanvasElemen
 }
 
 function renderHeaders(grid: Grid): void {
-  const { context, canvas, columnDefinitions, rowDefinitions, scrollLeft, scrollTop } = grid;
+  const { context, canvas, columnDefinitions, rowDefinitions, scrollLeft, scrollTop, selection } = grid;
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
 
-  context.fillStyle = "#9ca3af";
+  context.fillStyle = "#d7d8da";
   context.fillRect(0, 0, width, 32);
   context.fillRect(0, 0, 60, height);
 
@@ -41,6 +41,28 @@ function renderHeaders(grid: Grid): void {
   }
 
   context.stroke();
+
+  if (selection.mode === "column") {
+    const colIndex = selection.anchorCol;
+    const x = 60 + getColumnOffset(columnDefinitions, colIndex) - scrollLeft;
+    const columnWidth = columnDefinitions[colIndex].width;
+    context.fillStyle = "rgba(59,130,246,0.18)";
+    context.fillRect(x, 0, columnWidth, 32);
+    context.strokeStyle = "rgba(59,130,246,0.85)";
+    context.lineWidth = 2;
+    context.strokeRect(x + 0.5, 0.5, columnWidth - 1, 31);
+  }
+
+  if (selection.mode === "row") {
+    const rowIndex = selection.anchorRow;
+    const y = 32 + getRowOffset(rowDefinitions, rowIndex) - scrollTop;
+    const rowHeight = rowDefinitions[rowIndex].height;
+    context.fillStyle = "rgba(59,130,246,0.18)";
+    context.fillRect(0, y, 60, rowHeight);
+    context.strokeStyle = "rgba(59,130,246,0.85)";
+    context.lineWidth = 2;
+    context.strokeRect(0.5, y + 0.5, 59, rowHeight - 1);
+  }
 
   context.fillStyle = "#000000";
   context.font = "600 12px ui-sans-serif, system-ui";
@@ -74,7 +96,7 @@ function renderHeaders(grid: Grid): void {
   context.restore();
 
   // Corner cell is drawn last so scrolling headers pass behind it.
-  context.fillStyle = "#9ca3af";
+  context.fillStyle = "#d7d8da";
   context.fillRect(0, 0, 60, 32);
   context.strokeStyle = "rgba(0,0,0,0.15)";
   context.lineWidth = 1;

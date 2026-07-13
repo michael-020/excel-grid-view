@@ -45,6 +45,22 @@
   - `models/` — core model classes like `Cell`, `DataStore`, `Dimension`, `Range`, `Selection`
   - `data/sampleData.ts` — sample record generation
 
+
+### Component Responsibilities
+
+- `main.ts`: bootstraps the grid, wires the canvas, and starts initialization.
+- `Grid`: coordinates state, event wiring, rendering, and public actions such as undo/redo.
+- `DataStore`: stores cell values in a sparse map keyed by row and column.
+- `Selection`: tracks the active cell, row, column, or range selection mode.
+- `CommandManager`: maintains undo/redo stacks for reversible actions.
+- `GridRenderer`: draws the canvas viewport, headers, selection outline, and summary content.
+- `GridLayout`: computes offsets, visible ranges, and resize geometry.
+- `GridEditor`: handles edit input state, formula insertion, and edit application.
+- `GridKeyboard`: responds to keyboard navigation, copy/paste, and undo/redo shortcuts.
+- `GridMouse`: handles pointer selection and resize interactions.
+- `GridClipboard`: copies and pastes cell values between selections.
+- `GridDoubleClick`: opens editing mode or selects full rows/columns on double click.
+
 ## How OOP Concepts Are Applied
 
 - Encapsulation: `Grid`, `DataStore`, `Selection`, and command classes hide implementation details behind methods.
@@ -109,6 +125,31 @@
 - The text input editor uses native focus, allowing keyboard users to type normally.
 - The summary bar is marked with `aria-live="polite"` for screen reader updates.
 - Additional ARIA roles and focus management can be added for better accessibility.
+
+## Scenario Matrix
+
+| # | Scenario | Expected Result | Actual Result |
+|---|---|---|---|
+| 1 | Application loads for the first time | The grid renders with headers, sample data, and a selected starting cell | The app initializes the canvas, loads sample data, and renders the grid successfully |
+| 2 | User clicks a cell | The clicked cell becomes the active selection | The selection model updates and the canvas redraws the active range |
+| 3 | User double-clicks a cell | The edit input opens for in-place editing | The double-click handler opens the editor and selects the cell |
+| 4 | User double-clicks a column header | The full column is selected and the header is highlighted | Column selection is applied and the header highlight is drawn |
+| 5 | User double-clicks a row header | The full row is selected and the header is highlighted | Row selection is applied and the header highlight is drawn |
+| 6 | User presses Arrow keys | Selection moves to the adjacent cell and the view stays aligned | Keyboard navigation updates the active cell and scrolls it into view |
+| 7 | User presses Enter on a selected cell | The edit input opens for the selected cell | Enter opens the editor when the grid is not already editing |
+| 8 | User edits a cell with plain text | The value is stored and the summary updates | The value is committed through the edit command and the renderer refreshes |
+| 9 | User enters a formula such as =SUM(A1:A3) | The formula computes and stores the result | Formula evaluation is supported for the implemented aggregate functions |
+| 10 | User enters an invalid formula | An error state is shown and the cell stores an error marker | The grid records a formula error and displays it in the summary bar |
+| 11 | User copies a selection | The clipboard contains the selected values | Copy handling stores the selected cell values for later paste |
+| 12 | User pastes into a new target range | The values are inserted into the target cells | Paste logic writes clipboard contents into the selected region |
+| 13 | User resizes a column by dragging its edge | The column width changes and the resize is undoable | The resize command updates the width and can be reversed via undo |
+| 14 | User resizes a row by dragging its edge | The row height changes and the resize is undoable | The resize command updates the row height and can be reversed |
+| 15 | User presses Ctrl/Cmd+Z after editing a cell | The previous edit is undone | Undo is handled via the command manager and the grid re-renders |
+| 16 | User presses Ctrl/Cmd+Shift+Z after undo | The undone change is reapplied | Redo replays the command from the redo stack |
+| 17 | User presses Ctrl/Cmd+Y after undo | The undone change is reapplied | Redo also works through the same command path |
+| 18 | User selects a range by dragging | The range highlight covers the chosen cells | Drag selection updates the range and redraws the selection box |
+| 19 | Summary bar updates after a selection change | The summary reflects the selected values | The selection summary is calculated and written to the summary bar |
+| 20 | Scroll position changes | Visible cells and headers update correctly with the viewport | Rendering uses the current scroll offsets to draw the visible portion |
 
 ## Known Limitations and Next Improvements
 
