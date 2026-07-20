@@ -1,6 +1,8 @@
 import type { Grid } from "../Grid.js";
 import { showEditInput } from "./GridEditor.js";
+import { ensureCellVisible } from "./GridLayout.js";
 
+// this function handles all the actions to be done when a key-down event is triggered
 export function handleKeyDown(grid: Grid, event: KeyboardEvent): void {
   const isUndo = (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z";
   const isRedo = (event.ctrlKey || event.metaKey) && (event.shiftKey && event.key.toLowerCase() === "z" || event.key.toLowerCase() === "y");
@@ -54,6 +56,7 @@ export function handleKeyDown(grid: Grid, event: KeyboardEvent): void {
   }
 }
 
+// this function handles navigation inside of a grid using arrow keys
 export function navigateByKey(grid: Grid, key: string): void {
   let row = grid.selection.anchorRow;
   let col = grid.selection.anchorCol;
@@ -79,12 +82,4 @@ export function navigateByKey(grid: Grid, key: string): void {
   ensureCellVisible(grid, row, col);
   grid.hideFormulaMenu();
   grid.render();
-}
-
-export function ensureCellVisible(grid: Grid, row: number, col: number): void {
-  const x = grid.columnDefinitions.slice(0, col).reduce((sum, column) => sum + column.width, 0);
-  const y = grid.rowDefinitions.slice(0, row).reduce((sum, rowDef) => sum + rowDef.height, 0);
-  const left = Math.max(0, x - 20);
-  const top = Math.max(0, y - 20);
-  window.scrollTo({ left, top, behavior: "smooth" });
 }

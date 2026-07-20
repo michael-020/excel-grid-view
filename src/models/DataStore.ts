@@ -25,6 +25,9 @@ export class DataStore {
   public getEntries(): Array<{ row: number; col: number; value: string | number }> {
     return Array.from(this.values.entries()).map(([key, value]) => {
       const [row, col] = key.split(":").map(Number);
+      if(typeof(row) === "undefined" || typeof(col) == "undefined"){
+        throw new Error("row or column is undefined");
+      }
       return { row, col, value };
     });
   }

@@ -1,6 +1,7 @@
 import type { Grid } from "../Grid.js";
 import { BatchEditCommand } from "../commands/BatchEditCommand.js";
 
+// this function is used to copy selected cells in the grid
 export function copySelection(grid: Grid): void {
   const range = grid.selection.range;
   const rows = range.maxRow - range.minRow + 1;
@@ -18,6 +19,7 @@ export function copySelection(grid: Grid): void {
   grid.clipboard = { rows, cols, values };
 }
 
+// this function is used to paste copied cells present in the clipboard
 export function pasteClipboardAt(grid: Grid, targetRow: number, targetCol: number): void {
   if (!grid.clipboard) {
     return;
@@ -28,9 +30,9 @@ export function pasteClipboardAt(grid: Grid, targetRow: number, targetCol: numbe
     for (let c = 0; c < grid.clipboard.cols; c += 1) {
       const destRow = targetRow + r;
       const destCol = targetCol + c;
-      const newValue = grid.clipboard.values[r][c];
+      const newValue = grid.clipboard.values[r]![c];
       const oldValue = grid.data.getCellValue(destRow, destCol);
-      if (oldValue !== newValue) {
+      if (oldValue !== newValue && typeof(newValue) !== 'undefined') {
         edits.push({ row: destRow, col: destCol, oldValue: oldValue ?? "", newValue });
       }
     }

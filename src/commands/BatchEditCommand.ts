@@ -15,7 +15,7 @@ export class BatchEditCommand implements Command {
 
   undo(): void {
     for (let i = this.edits.length - 1; i >= 0; i -= 1) {
-      const e = this.edits[i];
+      const e = this.edits[i]!;
       if (e.oldValue === "" || e.oldValue === undefined) {
         this.dataStore.deleteCell(e.row, e.col);
       } else {

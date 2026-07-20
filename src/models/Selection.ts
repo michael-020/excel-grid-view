@@ -38,9 +38,6 @@ export class Selection {
   }
 
   public getSummary(data: DataStore): {
-    mode: string;
-    anchor: string;
-    range: string;
     count: number;
     sumString: string;
     minString: string;
@@ -68,9 +65,6 @@ export class Selection {
     const avg = values.length > 0 ? sum / values.length : undefined;
 
     return {
-      mode: this.mode,
-      anchor: `${this.anchorRow + 1}:${this.anchorCol + 1}`,
-      range: `${this.range.minRow + 1}:${this.range.minCol + 1} - ${this.range.maxRow + 1}:${this.range.maxCol + 1}`,
       count,
       sumString: values.length > 0 ? sum.toString() : "0",
       minString: min !== undefined ? min.toString() : "-",

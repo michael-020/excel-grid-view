@@ -1,8 +1,10 @@
 import type { Grid } from "../Grid.js";
 import { EditCellCommand } from "../commands/EditCellCommand.js";
+import { CELL_HEIGHT, CELL_WIDTH, MIN_CELL_HEIGHT } from "../lib/constants.js";
 import { evaluateFormula } from "./GridFormulas.js";
 import { getColumnOffset, getRowOffset, autoResizeColumnIfNeeded } from "./GridLayout.js";
 
+// this function handles changes in the input box that is rendered in a cell
 export function handleEditInputChange(grid: Grid): void {
   const value = grid.editInput.value || "";
   const formulaMenu = document.getElementById("formula-menu") as HTMLDivElement | null;
@@ -10,10 +12,11 @@ export function handleEditInputChange(grid: Grid): void {
   if (value === "=") {
     showFormulaMenuForSelection(grid);
   } else {
-    hideFormulaMenu(grid);
+    hideFormulaMenu();
   }
 }
 
+// this function is used to insert a certain formula inside the input box in a cell
 export function insertFormula(grid: Grid, func: string): void {
   grid.editInput.value = `=${func}()`;
   grid.editInput.focus();
@@ -21,35 +24,38 @@ export function insertFormula(grid: Grid, func: string): void {
   if (pos >= 0) {
     grid.editInput.setSelectionRange(pos + 1, pos + 1);
   }
-  hideFormulaMenu(grid);
+  hideFormulaMenu();
 }
 
+// this function is used to render forumla menu at the bottom of the selected cell
 export function showFormulaMenuForSelection(grid: Grid): void {
   const formulaMenu = document.getElementById("formula-menu") as HTMLDivElement | null;
   if (!formulaMenu) return;
   const row = grid.selection.anchorRow;
   const col = grid.selection.anchorCol;
-  const x = 60 + getColumnOffset(grid.columnDefinitions, col) - grid.scrollLeft;
-  const y = 32 + getRowOffset(grid.rowDefinitions, row) - grid.scrollTop;
+  const x = CELL_WIDTH + getColumnOffset(grid.columnDefinitions, col) - grid.scrollLeft;
+  const y = CELL_HEIGHT + getRowOffset(grid.rowDefinitions, row) - grid.scrollTop;
   const canvasRect = grid.canvas.getBoundingClientRect();
   formulaMenu.style.left = `${Math.max(8, canvasRect.left + x)}px`;
-  formulaMenu.style.top = `${canvasRect.top + y + (grid.rowDefinitions[row]?.height || 24) + 6}px`;
+  formulaMenu.style.top = `${canvasRect.top + y + (grid.rowDefinitions[row]?.height || MIN_CELL_HEIGHT) + 6}px`;
   formulaMenu.style.display = "block";
   formulaMenu.setAttribute("aria-hidden", "false");
 }
 
-export function hideFormulaMenu(grid: Grid): void {
+// this function is used to hide the forumla menu
+export function hideFormulaMenu(): void {
   const formulaMenu = document.getElementById("formula-menu") as HTMLDivElement | null;
   if (!formulaMenu) return;
   formulaMenu.style.display = "none";
   formulaMenu.setAttribute("aria-hidden", "true");
 }
 
+// this function is used to render an input box inside a selected cell
 export function showEditInput(grid: Grid, row: number, col: number): void {
-  const x = 60 + getColumnOffset(grid.columnDefinitions, col) - grid.scrollLeft;
-  const y = 32 + getRowOffset(grid.rowDefinitions, row) - grid.scrollTop;
-  const width = grid.columnDefinitions[col].width;
-  const height = grid.rowDefinitions[row].height;
+  const x = CELL_WIDTH + getColumnOffset(grid.columnDefinitions, col) - grid.scrollLeft;
+  const y = CELL_HEIGHT + getRowOffset(grid.rowDefinitions, row) - grid.scrollTop;
+  const width = grid.columnDefinitions[col]!.width;
+  const height = grid.rowDefinitions[row]!.height;
 
   grid.editInput.style.left = `${x}px`;
   grid.editInput.style.top = `${y}px`;
@@ -68,11 +74,13 @@ export function showEditInput(grid: Grid, row: number, col: number): void {
   grid.render();
 }
 
+// this function is used to hide the input box
 export function hideEditInput(grid: Grid): void {
   grid.editInput.style.display = "none";
   grid.canvas.focus();
 }
 
+// this function handles key-down events when a certain cell is selected 
 export function handleInputKeyDown(grid: Grid, event: KeyboardEvent): void {
   if (event.key === "Enter") {
     event.preventDefault();
@@ -90,20 +98,17 @@ export function handleInputKeyDown(grid: Grid, event: KeyboardEvent): void {
   }
 }
 
+// this function handles how the content is edited inside a cell
 export function applyEdit(grid: Grid, value: string): void {
   const row = grid.selection.anchorRow;
   const col = grid.selection.anchorCol;
 
-  if (value.trim().startsWith("='") || value.trim().startsWith("=\"")) {
-    // allow literal quoted strings after '='
-  }
-
-  if (value.trim().startsWith("=")) {
+  if (value.trim().startsWith("=") && value.trim().length > 1) {
     const result = evaluateFormula(value.trim(), grid.data);
     if (result.error) {
       grid.lastFormulaError = result.error;
       grid.commandManager.execute(new EditCellCommand(grid.data, row, col, "#ERROR"));
-      hideFormulaMenu(grid);
+      hideFormulaMenu();
       grid.render();
       return;
     }
@@ -115,7 +120,7 @@ export function applyEdit(grid: Grid, value: string): void {
     grid.commandManager.execute(new EditCellCommand(grid.data, row, col, finalValue));
     autoResizeColumnIfNeeded(grid, col, String(finalValue));
     grid.lastFormulaError = null;
-    hideFormulaMenu(grid);
+    hideFormulaMenu();
     grid.render();
     return;
   }

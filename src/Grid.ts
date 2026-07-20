@@ -4,16 +4,12 @@ import { Selection } from "./models/Selection.js";
 import { CommandManager } from "./commands/CommandManager.js";
 import { generateSampleRecords } from "./data/sampleData.js";
 import { renderGrid } from "./helpers/GridRenderer.js";
-import {
-  handleMouseDown,
-  handleMouseMove,
-  handleMouseUp,
-  handleDoubleClick,
-} from "./helpers/GridEvents.js";
 import { handleKeyDown } from "./helpers/GridKeyboard.js";
 import { copySelection, pasteClipboardAt } from "./helpers/GridClipboard.js";
 import { insertFormula, hideFormulaMenu, showEditInput, handleEditInputChange, handleInputKeyDown } from "./helpers/GridEditor.js";
-import { updateSpacerSize } from "./helpers/GridLayout.js";
+import { ensureCellVisible, updateSpacerSize } from "./helpers/GridLayout.js";
+import { handleMouseDown, handleMouseMove, handleMouseUp } from "./helpers/GridMouse.js";
+import { handleDoubleClick } from "./helpers/GridDoubleClick.js";
 
 interface GridOptions {
   rowCount: number;
@@ -64,7 +60,7 @@ export class Grid {
     this.wrapper = wrapper;
     this.spacer = spacer;
     this.editInput = editInput;
-    this.summaryBar = summaryBar;
+    this.summaryBar = summaryBar!;
     this.options = options;
 
     const context = canvas.getContext("2d");
@@ -125,9 +121,9 @@ export class Grid {
 
   private configureEventListeners(): void {
     window.addEventListener("scroll", () => this.render());
-    this.canvas.addEventListener("mousedown", (event) => handleMouseDown(this, event));
-    this.canvas.addEventListener("mousemove", (event) => handleMouseMove(this, event));
-    this.canvas.addEventListener("mouseup", () => handleMouseUp(this));
+    this.canvas.addEventListener("pointerdown", (event) => handleMouseDown(this, event));
+    this.canvas.addEventListener("pointermove", (event) => handleMouseMove(this, event));
+    this.canvas.addEventListener("pointerup", () => handleMouseUp(this));
     this.canvas.addEventListener("dblclick", (event) => handleDoubleClick(this, event));
     window.addEventListener("keydown", (event) => handleKeyDown(this, event));
     this.editInput.addEventListener("keydown", (event) => handleInputKeyDown(this, event));
@@ -168,7 +164,7 @@ export class Grid {
   }
 
   public hideFormulaMenu(): void {
-    hideFormulaMenu(this);
+    hideFormulaMenu();
   }
 
   private createDimensions(): void {
